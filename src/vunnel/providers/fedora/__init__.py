@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from vunnel import provider, result, schema
 
-from .parser import Parser, amazon_security_advisories
+from .parser import Parser
 
 if TYPE_CHECKING:
     import datetime
@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
 @dataclass
 class Config:
-    security_advisories: dict[Any, str] = field(default_factory=lambda: amazon_security_advisories.copy())
     runtime: provider.RuntimeConfig = field(
         default_factory=lambda: provider.RuntimeConfig(
             result_store=result.StoreStrategy.SQLITE,
@@ -23,9 +22,6 @@ class Config:
     )
     request_timeout: int = 125
     max_allowed_alas_http_403: int = 25
-
-    def __post_init__(self) -> None:
-        self.security_advisories = {str(k): str(v) for k, v in self.security_advisories.items()}
 
 
 class Provider(provider.Provider):
@@ -43,7 +39,6 @@ class Provider(provider.Provider):
 
         self.parser = Parser(
             workspace=self.workspace,
-            security_advisories=config.security_advisories,
             download_timeout=config.request_timeout,
             logger=self.logger,
             max_allowed_alas_http_403=config.max_allowed_alas_http_403,
@@ -51,12 +46,12 @@ class Provider(provider.Provider):
 
     @classmethod
     def name(cls) -> str:
-        return "amazon"
+        return "fedora"
 
     def update(self, last_updated: datetime.datetime | None) -> tuple[list[str], int]:
         with self.results_writer() as writer:
             # TODO: tech debt: on subsequent runs, we should only write new vulns (this currently re-writes all)
-            for vuln in self.parser.get(skip_if_exists=self.config.runtime.skip_if_exists):
+            for vuln in self.parser.get():
                 namespace = vuln.NamespaceName.lower()
                 vuln_id = vuln.Name.lower()
 

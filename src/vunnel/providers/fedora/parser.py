@@ -33,12 +33,10 @@ class Parser:
         self,
         workspace,
         download_timeout=125,
-        security_advisories=None,
         logger=None,
         max_allowed_alas_http_403=25,
     ):
         self.workspace = workspace
-        self.version_url_map = security_advisories if security_advisories else amazon_security_advisories
         self.download_timeout = download_timeout
         self.max_allowed_alas_http_403 = max_allowed_alas_http_403
         self.urls = []
@@ -51,13 +49,13 @@ class Parser:
 
     def _download_rss(self, rss_url, rss_file):
         try:
-            self.logger.info(f"downloading amazon security advisory from {rss_url}")
+            self.logger.info(f"downloading fedora security advisory from {rss_url}")
             self.urls.append(rss_url)
             r = http.get(rss_url, self.logger, timeout=self.download_timeout)
             with open(rss_file, "w", encoding="utf-8") as fp:
                 fp.write(r.text)
         except Exception:
-            self.logger.exception("error downloading amazon linux vulnerability feeds")
+            self.logger.exception("error downloading fedora vulnerability feeds")
             raise
 
     def _parse_rss(self, file_path):
@@ -66,27 +64,35 @@ class Parser:
 
         processing = False
         for event, element in ET.iterparse(file_path, events=("start", "end")):
-            import pdb; pdb.set_trace()
+            if event == "start" and element.tag == "item":
+                processing = True
+            elif processing and event == "end":
+                if element.tag == "item":
+                    processing = False
+                else:
+                    print(element.tag, element.text)
 
-#             if event == "start" and element.tag == "item":
-#                 processing = True
-#             elif processing and event == "end":
-#                 if element.tag == "title":
-#                     found = re.search(self._title_pattern_, element.text.strip())
-#                     alas_id = found.group(1)
-#                     sev = found.group(2)
-#                 elif element.tag == "description":
-#                     desc_str = element.text.strip()
-#                     cves = re.sub(self._whitespace_pattern_, "", desc_str).split(",") if desc_str else []
-#                 elif element.tag == "link":
-#                     url = element.text.strip()
-#                 elif element.tag == "item":
-#                     alas_summaries.append(AlasSummary(id=alas_id, url=url, sev=sev, cves=cves))
-#                     processing = False
+            if not processing and event == "end":
+                element.clear()
+        #             if event == "start" and element.tag == "item":
+        #                 processing = True
+        #             elif processing and event == "end":
+        #                 if element.tag == "title":
+        #                     found = re.search(self._title_pattern_, element.text.strip())
+        #                     alas_id = found.group(1)
+        #                     sev = found.group(2)
+        #                 elif element.tag == "description":
+        #                     desc_str = element.text.strip()
+        #                     cves = re.sub(self._whitespace_pattern_, "", desc_str).split(",") if desc_str else []
+        #                 elif element.tag == "link":
+        #                     url = element.text.strip()
+        #                 elif element.tag == "item":
+        #                     alas_summaries.append(AlasSummary(id=alas_id, url=url, sev=sev, cves=cves))
+        #                     processing = False
 
-#             # clear the element if its not being processed
-#             if not processing and event == "end":
-#                 element.clear()
+        #             # clear the element if its not being processed
+        #             if not processing and event == "end":
+        #                 element.clear()
 
         return sorted(alas_summaries)
 
